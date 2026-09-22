@@ -61,11 +61,32 @@
         const formatRupiah = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka || 0);
         const MUAT_RATES = { 'belum': 0, 'gudang': 0, 'joni': 7000, 'tentative': 3500 };
 
-        // Komponen Sapaan Dinamis & Jam
+        // Komponen Sapaan Dinamis, Jam, Tanggal & Cuaca
         const Greeting = () => {
             const [time, setTime] = React.useState(new Date());
+            const [weather, setWeather] = React.useState({ temp: '--', desc: 'Memuat cuaca...', icon: '🌤️' });
+
             React.useEffect(() => {
                 const timer = setInterval(() => setTime(new Date()), 1000); // Tiap detik update
+                
+                // Mengambil data cuaca secara gratis (Otomatis deteksi wilayah secara umum)
+                fetch('https://api.open-meteo.com/v1/forecast?latitude=-6.2088&longitude=106.8456&current_weather=true')
+                    .then(res => res.json())
+                    .then(data => {
+                        const w = data.current_weather;
+                        let desc = 'Cerah';
+                        let icon = '☀️';
+                        // Mengubah kode cuaca internasional ke bahasa Indonesia
+                        if (w.weathercode >= 1 && w.weathercode <= 3) { desc = 'Berawan'; icon = '⛅'; }
+                        else if (w.weathercode >= 51 && w.weathercode <= 67) { desc = 'Hujan'; icon = '🌧️'; }
+                        else if (w.weathercode >= 80 && w.weathercode <= 99) { desc = 'Hujan Petir'; icon = '⛈️'; }
+                        
+                        setWeather({ temp: Math.round(w.temperature), desc, icon });
+                    })
+                    .catch(err => {
+                        setWeather({ temp: '--', desc: 'Sistem cuaca offline', icon: '☁️' });
+                    });
+
                 return () => clearInterval(timer);
             }, []);
 
@@ -76,14 +97,21 @@
             else if (hour >= 15 && hour < 18) greeting = 'Sore';
 
             const timeString = time.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            
+            // Format Tanggal Keren (Contoh: Selasa, 22 Sep 2026)
+            const dateString = time.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
 
             return (
                 <div className="flex flex-col items-end text-right">
-                    <span className="text-sm font-bold text-gray-900">Selamat {greeting}, Admin • {timeString}</span>
-                    <span className="text-[10px] text-gray-800 font-semibold opacity-90 hidden sm:block">Jangan lupa makan, banyak minum air putih & jaga kesehatan! 💧</span>
+                    <span className="text-sm font-extrabold text-gray-900">Selamat {greeting}, Admin • {timeString}</span>
+                    <span className="text-xs text-gray-800 font-bold mt-0.5 flex items-center gap-1.5 hidden sm:flex">
+                        📅 {dateString} <span className="opacity-40">|</span> {weather.icon} {weather.desc} ({weather.temp}°C)
+                    </span>
+                    <span className="text-[9px] text-gray-900/70 font-bold mt-0.5 hidden sm:block">Jangan lupa makan, banyak minum air putih & jaga kesehatan! 💧</span>
                 </div>
             );
         };
+
 
         const App = () => {
             // STATE DATA TERKONEKSI KE LOCAL STORAGE BROWSER (ANTI HILANG)
@@ -555,7 +583,7 @@
                         <div className="flex items-center gap-4">
                             <span className="font-extrabold text-lg sm:text-xl tracking-wider flex items-center gap-2 drop-shadow-md">
                                 <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-                                PrismCargo
+                                WHS•CALCULATE
                             </span>
                         </div>
                         <Greeting />
