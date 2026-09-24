@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -228,23 +229,30 @@
                             else if (format === 'CNID') {
                                 let currentMarking = "";
                                 let currentAddress = "-";
-                                let cnidMap = {}; // Penyimpanan sementara untuk menggabungkan data
+                                let cnidMap = {}; 
 
                                 for (let i = headerRowIndex + 1; i < data.length; i++) {
                                     const row = data[i] || [];
-                                    if (row.length === 0) continue;
+                                    
+                                    // 1. Cek Baris Kosong: Jika ini baris kosong murni pemisah tabel, STOP menyedot data ke marking terakhir
+                                    const isBlankRow = row.length === 0 || row.every(c => !c || String(c).trim() === '');
+                                    if (isBlankRow) {
+                                        currentMarking = ""; // Putuskan ikatan marking di sini
+                                        continue;
+                                    }
+
+                                    // 2. Cek Tulisan TOTAL: Deteksi jika ada kata TOTAL / 合计 di sel mana pun di baris ini
+                                    const rowString = row.join("").toUpperCase();
+                                    if (rowString.includes('TOTAL') || rowString.includes('合计')) {
+                                        break; // Hentikan pencarian total, tabel sudah habis!
+                                    }
                                     
                                     const markVal = (row[0] || '').toString().trim();
                                     
-                                    // Berhenti jika mendeteksi baris TOTAL di bawah
-                                    if (markVal.toUpperCase().includes('TOTAL') || markVal.includes('合计') || (row[1] || '').toString().toUpperCase().includes('TOTAL')) break; 
-
-                                    // Jika sel Marking ada isinya (tidak di-merge/kosong), update currentMarking
-                                    // Jika kosong, sistem tetap pakai marking yang terakhir (currentMarking)
+                                    // Jika ketemu teks di kolom pertama, jadikan itu sebagai Marking baru
                                     if (markVal !== "") {
                                         currentMarking = markVal;
                                         
-                                        // Cari alamat di kolom paling ujung untuk marking baru ini
                                         let addressVal = '-';
                                         if (row.length > 17) {
                                             for (let j = row.length - 1; j >= 17; j--) {
@@ -257,18 +265,15 @@
                                         currentAddress = addressVal;
                                     }
 
-                                    // Abaikan baris kosong jika belum ada marking sama sekali di awal file
+                                    // Jika tidak ada marking yang aktif (karena sudah diputus baris kosong), lewati
                                     if (!currentMarking) continue;
 
-                                    // Ambil nilai QTY, CBM, GW di baris tersebut
                                     let ctnVal = parseFloat(row[4]) || 0;
                                     let cbmVal = parseFloat(row[14]) || 0;
                                     let gwVal = parseFloat(row[16]) || 0;
 
-                                    // Jika tidak ada data yang bisa dihitung di baris itu, lewati
                                     if (ctnVal === 0 && cbmVal === 0) continue;
 
-                                    // Masukkan dan gabungkan (akumulasi) ke dalam Map berdasarkan Marking
                                     if (!cnidMap[currentMarking]) {
                                         cnidMap[currentMarking] = {
                                             id: 'item_' + Date.now() + Math.random(),
@@ -280,15 +285,13 @@
                                         };
                                     }
                                     
-                                    // Tambahkan jumlah QTY, CBM, dan GW dari sel yang ter-merge
+                                    // Gabungkan nilai CTN, CBM, GW dari sel di bawahnya
                                     cnidMap[currentMarking].ctn += ctnVal;
                                     cnidMap[currentMarking].cbm += cbmVal;
                                     cnidMap[currentMarking].gw += gwVal;
                                 }
 
-                                // Ekstrak hasil gabungan ke array utama aplikasi
                                 Object.values(cnidMap).forEach(item => {
-                                    // Bersihkan angka desimal agar tidak terlalu panjang
                                     item.cbm = parseFloat(item.cbm.toFixed(3));
                                     item.gw = parseFloat(item.gw.toFixed(2));
                                     extractedItems.push(item);
@@ -1173,3 +1176,4 @@
     </script>
 </body>
 </html>
+```
