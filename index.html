@@ -227,36 +227,63 @@
                                 }
                             } 
                             else if (format === 'CNID') {
-                                for (let i = headerRowIndex + 1; i < data.length; i++) {
-                                    const row = data[i] || [];
-                                    if (row.length === 0) continue;
-                                    
-                                    // Ambil Marking Paten di Kolom A (Index 0)
-                                    const markVal = String(row[0] || '').trim();
-                                    if (!markVal) continue;
-                                    if (markVal.toUpperCase().includes('TOTAL') || markVal.includes('合计')) break; 
-
-                                    // Cari Alamat: Biasanya diletakkan di kolom paling ujung (akhir array row)
-                                    let addressVal = '-';
-                                    if (row.length > 17) {
-                                        for (let j = row.length - 1; j >= 17; j--) {
-                                            if (row[j] && String(row[j]).trim() !== '') {
-                                                addressVal = String(row[j]).trim();
-                                                break;
-                                            }
-                                        }
-                                    }
-
-                                    extractedItems.push({
-                                        id: 'item_' + Date.now() + Math.random(),
-                                        marking: markVal,
-                                        ctn: parseFloat(row[4]) || 0,      // Kolom E(4)
-                                        cbm: parseFloat(row[14]) || 0,     // Kolom O(14)
-                                        gw: parseFloat(row[16]) || 0,      // Kolom Q(16)
-                                        address: addressVal                // Ujung baris
-                                    });
-                                }
-                            }
+let currentMarking = "";
+let currentAddress = "-";
+let cnidMap = {}; // Penyimpanan sementara untuk menggabungkan data
+​for (let i = headerRowIndex + 1; i < data.length; i++) {
+const row = data[i] || [];
+if (row.length === 0) continue;
+​const markVal = (row[0] || '').toString().trim();
+​// Berhenti jika mendeteksi baris TOTAL di bawah
+if (markVal.toUpperCase().includes('TOTAL') || markVal.includes('合计') || (row[1] || '').toString().toUpperCase().includes('TOTAL')) break;
+​// Jika sel Marking ada isinya (tidak di-merge/kosong), update currentMarking
+// Jika kosong, sistem tetap pakai marking yang terakhir (currentMarking)
+if (markVal !== "") {
+currentMarking = markVal;
+​// Cari alamat di kolom paling ujung untuk marking baru ini
+let addressVal = '-';
+if (row.length > 17) {
+for (let j = row.length - 1; j >= 17; j--) {
+if (row[j] && String(row[j]).trim() !== '') {
+addressVal = String(row[j]).trim();
+break;
+}
+}
+}
+currentAddress = addressVal;
+}
+​// Abaikan baris kosong jika belum ada marking sama sekali di awal file
+if (!currentMarking) continue;
+​// Ambil nilai QTY, CBM, GW di baris tersebut
+let ctnVal = parseFloat(row[4]) || 0;
+let cbmVal = parseFloat(row[14]) || 0;
+let gwVal = parseFloat(row[16]) || 0;
+​// Jika tidak ada data yang bisa dihitung di baris itu, lewati
+if (ctnVal === 0 && cbmVal === 0) continue;
+​// Masukkan dan gabungkan (akumulasi) ke dalam Map berdasarkan Marking
+if (!cnidMap[currentMarking]) {
+cnidMap[currentMarking] = {
+id: 'item_' + Date.now() + Math.random(),
+marking: currentMarking,
+ctn: 0,
+cbm: 0,
+gw: 0,
+address: currentAddress
+};
+}
+​// Tambahkan jumlah QTY, CBM, dan GW dari sel yang ter-merge
+cnidMap[currentMarking].ctn += ctnVal;
+cnidMap[currentMarking].cbm += cbmVal;
+cnidMap[currentMarking].gw += gwVal;
+}
+​// Ekstrak hasil gabungan ke array utama aplikasi
+Object.values(cnidMap).forEach(item => {
+// Bersihkan angka desimal agar tidak terlalu panjang
+item.cbm = parseFloat(item.cbm.toFixed(3));
+item.gw = parseFloat(item.gw.toFixed(2));
+extractedItems.push(item);
+});
+}
 
                             if (extractedItems.length > 0) {
                                 extractedItems.sort((a, b) => a.address.localeCompare(b.address) || a.marking.localeCompare(b.marking));
